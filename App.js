@@ -4,7 +4,7 @@ import {
   PanResponder,
   View,
   Dimensions,
-  TouchableOpacity,
+  Pressable,
 } from "react-native";
 import styled from "styled-components/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,8 +26,8 @@ const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get("window");
 const getRandomNumber = (max) => Math.floor(Math.random() * max);
 
 const getRandomPosition = (maxX, maxY) => {
-  const x = getRandomNumber(maxX);
-  const y = getRandomNumber(maxY);
+  const x = getRandomNumber(maxX - ALPHABET_BALL_SIZE);
+  const y = getRandomNumber(maxY - QUIZ_CONTAINER_FLEX);
   return { x, y };
 };
 const Container = styled.View`
@@ -44,6 +44,7 @@ const WordsContainer = styled.View`
 `;
 
 const AlphabetBall = styled(Animated.createAnimatedComponent(View))`
+  position: relative;
   background-color: white;
   width: ${ALPHABET_BALL_SIZE}px;
   height: ${ALPHABET_BALL_SIZE}px;
@@ -51,16 +52,14 @@ const AlphabetBall = styled(Animated.createAnimatedComponent(View))`
   justify-content: center;
   align-items: center;
 `;
-const TouchableAlphabet = styled(
-  Animated.createAnimatedComponent(TouchableOpacity)
-)`
+const TouchableAlphabet = styled(Animated.createAnimatedComponent(Pressable))`
+  position: absolute;
   width: ${ALPHABET_BALL_SIZE}px;
   height: ${ALPHABET_BALL_SIZE}px;
   border-radius: 50px;
   justify-content: center;
   align-items: center;
   background-color: white;
-  z-index: 900;
 `;
 
 const AlphabetText = styled.Text`
@@ -74,20 +73,20 @@ const AnswerContainer = styled.View`
   flex: ${ANSWER_CONTAINER_FLEX};
   justify-content: center;
   align-items: center;
-  margin-bottom: 20px;
 `;
 const AnswerBox = styled.Text`
   border: 1px solid white;
   color: white;
   width: auto;
-  min-width: 60px;
-  min-height: 60px;
+  width: 60px;
+  height: 60px;
   font-size: 30px;
   line-height: 60px;
   font-weight: 600;
   text-align: center;
   border-radius: 10px;
   padding: 0 15px;
+  margin-bottom: 20px;
 `;
 
 export default function App() {
@@ -140,27 +139,25 @@ export default function App() {
             balls[onPressInIndex].position.y = val.y;
           });
         },
-        onPanResponderRelease: (_, { dx, dy }) => {
+        onPanResponderRelease: () => {
           // 오프셋 + 이동거리 기본값 사용 후, 오프셋을 0으로 재설정
           onPressInPosition.flattenOffset();
         },
       }),
-
-    [balls, onPressInIndex]
+    [balls]
   );
 
   const makeAlphabets = () => {
-    const wordArr = word.split("");
-    const arr = wordArr.map((alphabet, index) => {
+    const arr = word.split("");
+    const words = arr.map((alphabet, index) => {
       const position = getRandomPosition(
-        WINDOW_WIDTH - ALPHABET_BALL_SIZE,
-        (WINDOW_HEIGHT / ALL_CONTAINER_FLEX) * WORDS_CONTAINER_FLEX -
-          ALPHABET_BALL_SIZE
+        WINDOW_WIDTH,
+        (WINDOW_HEIGHT / ALL_CONTAINER_FLEX) * WORDS_CONTAINER_FLEX
       );
-      const obj = { index, position, alphabet };
-      return obj;
+      const word = { index, position, alphabet };
+      return word;
     });
-    setData(arr);
+    setData(words);
     // setLoading(false);
   };
   useEffect(() => {
@@ -181,40 +178,31 @@ export default function App() {
         <Ionicons name={icons[quizIconIndex]} size={90} color="white" />
       </QuizIconContainer>
       <WordsContainer>
-        {balls?.map((ball) => {
-          return (
-            <AlphabetBall
-              {...panResponder.panHandlers}
-              key={ball.index}
-              style={{
-                position: "relative",
-                left: ball.index !== onPressInIndex ? ball.position.x : 0,
-                top: ball.index !== onPressInIndex ? ball.position.y : 0,
-                transform:
-                  ball.index === onPressInIndex
-                    ? onPressInPosition.getTranslateTransform()
-                    : null,
+        {balls?.map((ball) => (
+          <AlphabetBall
+            {...panResponder.panHandlers}
+            key={ball.index}
+            style={{
+              left:
+                ball.index !== onPressInIndex
+                  ? ball.position.x
+                  : onPressInPosition.x,
+              top:
+                ball.index !== onPressInIndex
+                  ? ball.position.y
+                  : onPressInPosition.y,
+            }}
+          >
+            <TouchableAlphabet
+              onPressIn={() => {
+                setOnPressInIndex(ball.index);
               }}
+              key={ball.index}
             >
-              <TouchableAlphabet
-                onPressIn={() => {
-                  setOnPressInIndex(ball.index);
-                }}
-                key={ball.index}
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 50,
-                  position: "absolute",
-                  borderColor: "blue",
-                  borderWidth: 1,
-                }}
-              >
-                <AlphabetText key={ball.index}>{ball.alphabet}</AlphabetText>
-              </TouchableAlphabet>
-            </AlphabetBall>
-          );
-        })}
+              <AlphabetText key={ball.index}>{ball.alphabet}</AlphabetText>
+            </TouchableAlphabet>
+          </AlphabetBall>
+        ))}
       </WordsContainer>
       <AnswerContainer>
         <AnswerBox>_</AnswerBox>
