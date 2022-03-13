@@ -26,8 +26,9 @@ const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get("window");
 const getRandomNumber = (max) => Math.floor(Math.random() * max);
 
 const getRandomPosition = (maxX, maxY) => {
+  console.log("max Y: ", maxY);
   const x = getRandomNumber(maxX - ALPHABET_BALL_SIZE);
-  const y = getRandomNumber(maxY - QUIZ_CONTAINER_FLEX);
+  const y = getRandomNumber(maxY - ALPHABET_BALL_SIZE);
   return { x, y };
 };
 const Container = styled.View`
@@ -44,7 +45,7 @@ const WordsContainer = styled.View`
 `;
 
 const AlphabetBall = styled(Animated.createAnimatedComponent(View))`
-  position: relative;
+  position: absolute;
   background-color: white;
   width: ${ALPHABET_BALL_SIZE}px;
   height: ${ALPHABET_BALL_SIZE}px;
@@ -104,7 +105,6 @@ export default function App() {
         const {
           position: { x, y },
         } = obj;
-
         return {
           ...obj,
           animatedVal:
@@ -167,7 +167,8 @@ export default function App() {
   }, [word, loading]);
 
   useEffect(() => {
-    const randomIndex = getRandomNumber(0, ICONS_LENGTH + 1);
+    // const randomIndex = getRandomNumber(ICONS_LENGTH + 1);
+    const randomIndex = getRandomNumber(1);
     setQuizIconIndex(randomIndex);
     setWord(icons[randomIndex]);
   }, []);
