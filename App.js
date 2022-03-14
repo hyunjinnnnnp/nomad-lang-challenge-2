@@ -251,10 +251,29 @@ export default function App() {
     Animated.parallel([answerFadeIn, answerBgFadeOut]),
   ]);
 
-  const clickedAnim = Animated.sequence([
+  const correctIndexClickedAnim = Animated.sequence([
     moveBallToBottom,
     Animated.parallel([scaleOut, moveBallToCenter, contentFadeAnim]),
   ]);
+  const handleCorrectIndexClick = (alphabet, index) => {
+    // 클릭된 알파벳 순서가 맞다면 계속 진행
+    correctIndexClickedAnim.start(() => {
+      setAnswer((prev) => prev + alphabet);
+      ballScale.setValue(1);
+      // 알파벳 볼 제거
+      setHiddenBalls([...hiddenBalls, index]);
+    });
+    setCorrectIndex((prev) => prev + 1);
+  };
+
+  const wrongIndexClickedAnim = Animated.spring(onPressInPosition, {
+    toValue: {
+      x: onPressInPosition.x._value + getRandomNumber(20),
+      y: onPressInPosition.y._value + getRandomNumber(20),
+    },
+    useNativeDriver: true,
+    tension: 1000,
+  });
 
   return (
     <Container>
@@ -288,21 +307,15 @@ export default function App() {
                 }}
               >
                 <TouchableAlphabet
-                  onPressIn={() => {
-                    setOnPressInIndex(ball.index);
-                  }}
+                  onLongPress={() => {}}
+                  onPressIn={() => setOnPressInIndex(ball.index)}
                   onPress={() => {
                     // 오답이라면 공 튕겨나간다
-                    if (ball.index === correctIndex) {
-                      // 클릭된 알파벳 순서가 맞다면 계속 진행
-                      clickedAnim.start(() => {
-                        setAnswer((prev) => prev + ball.alphabet);
-                        ballScale.setValue(1);
-                        // 알파벳 볼 제거
-                        setHiddenBalls([...hiddenBalls, ball.index]);
-                      });
-                      setCorrectIndex((prev) => prev + 1);
+                    if (ball.index !== correctIndex) {
+                      wrongIndexClickedAnim.start();
+                      return;
                     }
+                    handleCorrectIndexClick(ball.alphabet, ball.index);
                     // 다음 터치 눌리는 데 너무 오래 걸리면 ? 다음 인덱스 공 흔들흔들
                   }}
                   key={ball.index}
