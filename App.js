@@ -88,6 +88,7 @@ const AnswerBorder = styled(Animated.createAnimatedComponent(View))`
   border-radius: 10px;
   min-width: 60px;
   height: 60px;
+  align-self: center;
 `;
 const AnswerBg = styled(Animated.createAnimatedComponent(View))`
   position: absolute;
@@ -96,18 +97,18 @@ const AnswerBg = styled(Animated.createAnimatedComponent(View))`
   width: auto;
   min-width: 60px;
   height: 60px;
+  align-self: center;
 `;
 const AnswerText = styled(Animated.createAnimatedComponent(Text))`
   position: absolute;
   min-width: 60px;
-  /* height: 60px; */
-  width: auto;
   padding: 0 15px;
   font-size: 30px;
   line-height: 60px;
   font-weight: 600;
   text-align: center;
   color: white;
+  align-self: center;
 `;
 export default function App() {
   const [data, setData] = useState([]);
@@ -118,6 +119,7 @@ export default function App() {
   const [wordContainerHeight, setWordContainerHeight] = useState();
   const [answer, setAnswer] = useState("");
   const [correctIndex, setCorrectIndex] = useState(0);
+  const [hiddenBalls, setHiddenBalls] = useState([]);
 
   const onPressInPosition = useRef(new Animated.ValueXY()).current;
   const ballScale = useRef(new Animated.Value(1)).current;
@@ -146,7 +148,10 @@ export default function App() {
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponder: (_, { dx, dy }) => {
+          // if dragged ? setPanResponder
+          return dx > 2 || dx < -2 || dy > 2 || dy < -2;
+        },
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: () => {
           // 오프셋 설정 (현 위치 누적값으로 저장)
@@ -204,7 +209,7 @@ export default function App() {
     toValue: 0,
     useNativeDriver: true,
   });
-  const moveToCenter = Animated.timing(onPressInPosition, {
+  const moveBallToCenter = Animated.timing(onPressInPosition, {
     toValue: {
       x: WINDOW_WIDTH / 2 - ALPHABET_BALL_SIZE + 20,
       y: wordContainerHeight + 20,
@@ -232,7 +237,7 @@ export default function App() {
     useNativeDriver: true,
   });
 
-  const moveBall = Animated.timing(onPressInPosition, {
+  const moveBallToBottom = Animated.timing(onPressInPosition, {
     toValue: {
       x: WINDOW_WIDTH / 2 - ALPHABET_BALL_SIZE + 40,
       y: wordContainerHeight + 20,
@@ -245,9 +250,10 @@ export default function App() {
     Animated.parallel([answerFadeOut, answerBgFadeIn]),
     Animated.parallel([answerFadeIn, answerBgFadeOut]),
   ]);
+
   const clickedAnim = Animated.sequence([
-    moveBall,
-    Animated.parallel([scaleOut, moveToCenter, contentFadeAnim]),
+    moveBallToBottom,
+    Animated.parallel([scaleOut, moveBallToCenter, contentFadeAnim]),
   ]);
 
   return (
@@ -262,50 +268,50 @@ export default function App() {
           },
         }) => setWordContainerHeight(height)}
       >
-        {balls?.map((ball) => (
-          <AlphabetBall
-            {...panResponder.panHandlers}
-            key={ball.index}
-            style={{
-              left: ball.index !== onPressInIndex ? ball.position.x : 0,
-              top: ball.index !== onPressInIndex ? ball.position.y : 0,
-              transform:
-                ball.index === onPressInIndex
-                  ? [
-                      { translateX: onPressInPosition.x },
-                      { translateY: onPressInPosition.y },
-                      { scale: ballScale },
-                    ]
-                  : null,
-            }}
-          >
-            <TouchableAlphabet
-              onPressIn={() => {
-                setOnPressInIndex(ball.index);
-              }}
-              onPress={() => {
-                if (ball.index === correctIndex) {
-                  // 이번 인덱스가 맞다면 계속 진행
-                  onPressInPosition.setValue({
-                    x: WINDOW_WIDTH / 2 - ALPHABET_BALL_SIZE / 2,
-                    y: wordContainerHeight + 20,
-                  });
-                  clickedAnim.start(() =>
-                    setAnswer((prev) => prev + ball.alphabet)
-                  );
-                  // 볼 제거
-                  setCorrectIndex((prev) => prev + 1);
-                } else {
-                  // 아니라면 공 튕겨나간다
-                }
-                // 다음 터치 눌리는 데 너무 오래 걸리면 ? 다음 인덱스 공 흔들흔들
-              }}
-              key={ball.index}
-            >
-              <AlphabetText key={ball.index}>{ball.alphabet}</AlphabetText>
-            </TouchableAlphabet>
-          </AlphabetBall>
-        ))}
+        {balls?.map(
+          (ball) =>
+            !hiddenBalls.includes(ball.index) && (
+              <AlphabetBall
+                {...panResponder.panHandlers}
+                key={ball.index}
+                style={{
+                  left: ball.index !== onPressInIndex ? ball.position.x : 0,
+                  top: ball.index !== onPressInIndex ? ball.position.y : 0,
+                  transform:
+                    ball.index === onPressInIndex
+                      ? [
+                          { translateX: onPressInPosition.x },
+                          { translateY: onPressInPosition.y },
+                          { scale: ballScale },
+                        ]
+                      : null,
+                }}
+              >
+                <TouchableAlphabet
+                  onPressIn={() => {
+                    setOnPressInIndex(ball.index);
+                  }}
+                  onPress={() => {
+                    // 오답이라면 공 튕겨나간다
+                    if (ball.index === correctIndex) {
+                      // 클릭된 알파벳 순서가 맞다면 계속 진행
+                      clickedAnim.start(() => {
+                        setAnswer((prev) => prev + ball.alphabet);
+                        ballScale.setValue(1);
+                        // 알파벳 볼 제거
+                        setHiddenBalls([...hiddenBalls, ball.index]);
+                      });
+                      setCorrectIndex((prev) => prev + 1);
+                    }
+                    // 다음 터치 눌리는 데 너무 오래 걸리면 ? 다음 인덱스 공 흔들흔들
+                  }}
+                  key={ball.index}
+                >
+                  <AlphabetText key={ball.index}>{ball.alphabet}</AlphabetText>
+                </TouchableAlphabet>
+              </AlphabetBall>
+            )
+        )}
       </WordsContainer>
       <AnswerContainer>
         <AnswerBox>
