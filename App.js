@@ -74,34 +74,36 @@ const AnswerContainer = styled.View`
   justify-content: center;
   align-items: center;
 `;
-const AnswerBoxBg = styled(Animated.createAnimatedComponent(View))`
-  position: absolute;
-  background-color: white;
-  width: auto;
-  width: 60px;
-  height: 60px;
+const AnswerBorder = styled.View`
+  position: relative;
   border-radius: 10px;
-`;
-const PrevAnswer = styled(Animated.createAnimatedComponent(Text))`
-  position: absolute;
   border: 1px solid white;
   width: auto;
   min-width: 60px;
   height: 60px;
-  border-radius: 10px;
-  padding: 0 15px;
   margin-bottom: 20px;
+`;
+const AnswerBoxBg = styled(Animated.createAnimatedComponent(View))`
+  position: absolute;
+  border-radius: 10px;
+  background-color: white;
+  width: auto;
+  min-width: 60px;
+  height: 60px;
+`;
+const Answer = styled(Animated.createAnimatedComponent(Text))`
+  position: absolute;
+  /* border: 1px solid white;
+  width: auto;
+  min-width: 60px;
+  height: 60px; */
+  padding: 0 15px;
   font-size: 30px;
   line-height: 60px;
   font-weight: 600;
   text-align: center;
   color: white;
-  flex: 1;
-  flex-wrap: wrap;
-  flex-grow: 1;
 `;
-const CurrentAnswer = styled(PrevAnswer)``;
-
 export default function App() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -109,15 +111,12 @@ export default function App() {
   const [quizIconIndex, setQuizIconIndex] = useState(0);
   const [onPressInIndex, setOnPressInIndex] = useState(null);
   const [wordContainerHeight, setWordContainerHeight] = useState();
-  const [prevAnswer, setPrevAnswer] = useState("");
-  const [currentAnswer, setCurrentAnswer] = useState("");
+  const [answer, setAnswer] = useState("");
 
   const onPressInPosition = useRef(new Animated.ValueXY()).current;
   const ballScale = useRef(new Animated.Value(1)).current;
-  const boxBgOpacity = useRef(new Animated.Value(0)).current;
-
-  const prevAnswerOpacity = useRef(new Animated.Value(1)).current;
-  const currentAnswerOpacity = useRef(new Animated.Value(0)).current;
+  const answerBgOpacity = useRef(new Animated.Value(0)).current;
+  const answerOpacity = useRef(new Animated.Value(1)).current;
 
   const balls = useMemo(
     () =>
@@ -204,47 +203,43 @@ export default function App() {
     },
     useNativeDriver: true,
   });
-  const answerBgFadeIn = Animated.timing(boxBgOpacity, {
+  const answerBgFadeIn = Animated.timing(answerBgOpacity, {
     toValue: 0.5,
+    duration: 200,
     useNativeDriver: false,
   });
-  const answerBgFadeOut = Animated.timing(boxBgOpacity, {
+  const answerBgFadeOut = Animated.timing(answerBgOpacity, {
     toValue: 0,
+    duration: 200,
     useNativeDriver: false,
   });
-  const prevAnswerFadeIn = Animated.timing(prevAnswerOpacity, {
+  const answerFadeIn = Animated.timing(answerOpacity, {
     toValue: 1,
+    duration: 200,
     useNativeDriver: true,
   });
-  const prevAnswerFadeOut = Animated.timing(prevAnswerOpacity, {
+  const answerFadeOut = Animated.timing(answerOpacity, {
     toValue: 0,
-    useNativeDriver: true,
-  });
-  const currentAnswerFadeIn = Animated.timing(currentAnswerOpacity, {
-    toValue: 1,
-    useNativeDriver: true,
-  });
-  const currentAnswerFadeOut = Animated.timing(currentAnswerOpacity, {
-    toValue: 0,
+    duration: 200,
     useNativeDriver: true,
   });
 
-  const answerFadeAnim = Animated.sequence([
-    Animated.parallel([prevAnswerFadeOut, currentAnswerFadeIn]),
-    Animated.parallel([prevAnswerFadeIn, currentAnswerFadeOut]),
+  const moveBall = Animated.timing(onPressInPosition, {
+    toValue: {
+      x: WINDOW_WIDTH / 2 - ALPHABET_BALL_SIZE + 40,
+      y: wordContainerHeight + 20,
+    },
+    duration: 10,
+    useNativeDriver: true,
+  });
+
+  const contentFadeAnim = Animated.sequence([
+    Animated.parallel([answerFadeOut, answerBgFadeIn]),
+    Animated.parallel([answerFadeIn, answerBgFadeOut]),
   ]);
-
   const clickedAnim = Animated.sequence([
-    Animated.timing(onPressInPosition, {
-      toValue: {
-        x: WINDOW_WIDTH / 2 - ALPHABET_BALL_SIZE + 40,
-        y: wordContainerHeight + 20,
-      },
-      duration: 10,
-      useNativeDriver: true,
-    }),
-    Animated.parallel([answerBgFadeIn, scaleOut, moveToCenter]),
-    Animated.parallel([answerFadeAnim, answerBgFadeOut]),
+    moveBall,
+    Animated.parallel([scaleOut, moveToCenter, contentFadeAnim]),
   ]);
 
   return (
@@ -285,8 +280,8 @@ export default function App() {
                   x: WINDOW_WIDTH / 2 - ALPHABET_BALL_SIZE / 2,
                   y: wordContainerHeight + 20,
                 });
-                clickedAnim.start();
-                answerFadeAnim.start(() => setPrevAnswer(ball.alphabet));
+
+                clickedAnim.start(() => setAnswer(ball.alphabet));
               }}
               key={ball.index}
             >
@@ -296,13 +291,10 @@ export default function App() {
         ))}
       </WordsContainer>
       <AnswerContainer>
-        <AnswerBoxBg style={{ opacity: boxBgOpacity }} />
-        <PrevAnswer style={{ opacity: prevAnswerOpacity }}>
-          {prevAnswer}_
-        </PrevAnswer>
-        <CurrentAnswer style={{ opacity: currentAnswerOpacity }}>
-          {currentAnswer}_
-        </CurrentAnswer>
+        <AnswerBorder>
+          <Answer style={{ opacity: answerOpacity }}>{answer}_</Answer>
+          <AnswerBoxBg style={{ opacity: answerBgOpacity }} />
+        </AnswerBorder>
       </AnswerContainer>
     </Container>
   );
