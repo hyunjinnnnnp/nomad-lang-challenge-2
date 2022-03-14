@@ -74,16 +74,22 @@ const AnswerContainer = styled.View`
   justify-content: center;
   align-items: center;
 `;
-const AnswerBorder = styled.View`
+const AnswerBox = styled(Animated.createAnimatedComponent(View))`
   position: relative;
   border-radius: 10px;
-  border: 1px solid white;
   width: auto;
   min-width: 60px;
   height: 60px;
   margin-bottom: 20px;
 `;
-const AnswerBoxBg = styled(Animated.createAnimatedComponent(View))`
+const AnswerBorder = styled(Animated.createAnimatedComponent(View))`
+  position: absolute;
+  border: 1px solid white;
+  border-radius: 10px;
+  min-width: 60px;
+  height: 60px;
+`;
+const AnswerBg = styled(Animated.createAnimatedComponent(View))`
   position: absolute;
   border-radius: 10px;
   background-color: white;
@@ -91,12 +97,11 @@ const AnswerBoxBg = styled(Animated.createAnimatedComponent(View))`
   min-width: 60px;
   height: 60px;
 `;
-const Answer = styled(Animated.createAnimatedComponent(Text))`
+const AnswerText = styled(Animated.createAnimatedComponent(Text))`
   position: absolute;
-  /* border: 1px solid white;
-  width: auto;
   min-width: 60px;
-  height: 60px; */
+  /* height: 60px; */
+  width: auto;
   padding: 0 15px;
   font-size: 30px;
   line-height: 60px;
@@ -112,11 +117,14 @@ export default function App() {
   const [onPressInIndex, setOnPressInIndex] = useState(null);
   const [wordContainerHeight, setWordContainerHeight] = useState();
   const [answer, setAnswer] = useState("");
+  const [correctIndex, setCorrectIndex] = useState(0);
 
   const onPressInPosition = useRef(new Animated.ValueXY()).current;
   const ballScale = useRef(new Animated.Value(1)).current;
   const answerBgOpacity = useRef(new Animated.Value(0)).current;
   const answerOpacity = useRef(new Animated.Value(1)).current;
+  const answerBgWidth = useRef(new Animated.Value(60)).current;
+  const answerBorderWidth = useRef(new Animated.Value(60)).current;
 
   const balls = useMemo(
     () =>
@@ -276,12 +284,21 @@ export default function App() {
                 setOnPressInIndex(ball.index);
               }}
               onPress={() => {
-                onPressInPosition.setValue({
-                  x: WINDOW_WIDTH / 2 - ALPHABET_BALL_SIZE / 2,
-                  y: wordContainerHeight + 20,
-                });
-
-                clickedAnim.start(() => setAnswer(ball.alphabet));
+                if (ball.index === correctIndex) {
+                  // 이번 인덱스가 맞다면 계속 진행
+                  onPressInPosition.setValue({
+                    x: WINDOW_WIDTH / 2 - ALPHABET_BALL_SIZE / 2,
+                    y: wordContainerHeight + 20,
+                  });
+                  clickedAnim.start(() =>
+                    setAnswer((prev) => prev + ball.alphabet)
+                  );
+                  // 볼 제거
+                  setCorrectIndex((prev) => prev + 1);
+                } else {
+                  // 아니라면 공 튕겨나간다
+                }
+                // 다음 터치 눌리는 데 너무 오래 걸리면 ? 다음 인덱스 공 흔들흔들
               }}
               key={ball.index}
             >
@@ -291,10 +308,24 @@ export default function App() {
         ))}
       </WordsContainer>
       <AnswerContainer>
-        <AnswerBorder>
-          <Answer style={{ opacity: answerOpacity }}>{answer}_</Answer>
-          <AnswerBoxBg style={{ opacity: answerBgOpacity }} />
-        </AnswerBorder>
+        <AnswerBox>
+          <AnswerText
+            onLayout={(event) => {
+              answerBorderWidth.setValue(event.nativeEvent.layout.width);
+              answerBgWidth.setValue(event.nativeEvent.layout.width);
+            }}
+            style={{ opacity: answerOpacity }}
+          >
+            {answer}_
+          </AnswerText>
+          <AnswerBg
+            style={{
+              opacity: answerBgOpacity,
+              width: answerBgWidth,
+            }}
+          />
+          <AnswerBorder style={{ width: answerBorderWidth }} />
+        </AnswerBox>
       </AnswerContainer>
     </Container>
   );
