@@ -52,15 +52,6 @@ const AlphabetBall = styled(Animated.createAnimatedComponent(View))`
   align-items: center;
   background-color: white;
 `;
-const TouchableAlphabet = styled(Animated.createAnimatedComponent(Pressable))`
-  position: absolute;
-  width: ${ALPHABET_BALL_SIZE}px;
-  height: ${ALPHABET_BALL_SIZE}px;
-  border-radius: 50px;
-  justify-content: center;
-  align-items: center;
-  background-color: white;
-`;
 const AlphabetText = styled.Text`
   color: ${MAIN_COLOR};
   font-size: 20px;
@@ -113,13 +104,17 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [word, setWord] = useState("");
   const [quizIconIndex, setQuizIconIndex] = useState(0);
+
+  const [correctIndex, setCorrectIndex] = useState(0);
   const [onPressInIndex, setOnPressInIndex] = useState(null);
+  const [clickedIndex, setClickedIndex] = useState(null);
+
   const [wordContainerHeight, setWordContainerHeight] = useState();
   const [answer, setAnswer] = useState("");
-  const [correctIndex, setCorrectIndex] = useState(0);
   const [hiddenBalls, setHiddenBalls] = useState([]);
 
   const onPressInPosition = useRef(new Animated.ValueXY()).current;
+  const correctIndexPosition = useRef(new Animated.ValueXY()).current;
 
   const ballScale = useRef(new Animated.Value(1)).current;
   const answerBgOpacity = useRef(new Animated.Value(0)).current;
@@ -131,7 +126,7 @@ export default function App() {
     toValue: 0,
     useNativeDriver: true,
   });
-  const moveBallToCenter = Animated.timing(onPressInPosition, {
+  const moveBallToCenter = Animated.timing(correctIndexPosition, {
     toValue: {
       x: WINDOW_WIDTH / 2 - ALPHABET_BALL_SIZE + 20,
       y: wordContainerHeight + 20,
@@ -158,7 +153,7 @@ export default function App() {
     duration: 200,
     useNativeDriver: true,
   });
-  const moveBallToBottom = Animated.timing(onPressInPosition, {
+  const moveBallToBottom = Animated.timing(correctIndexPosition, {
     toValue: {
       x: WINDOW_WIDTH / 2 - ALPHABET_BALL_SIZE + 40,
       y: wordContainerHeight + 20,
@@ -189,46 +184,50 @@ export default function App() {
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: (evt) => {
-          const index = evt._targetInst.memoizedProps.index;
+          const { index } = evt._targetInst.memoizedProps;
           setOnPressInIndex(index);
+          setClickedIndex(index);
           // 오프셋 설정 (현 위치 누적값으로 저장)
           onPressInPosition.setOffset({
             x: balls[index].position.x,
             y: balls[index].position.y,
           });
+          correctIndexPosition.setValue({
+            x: balls[index].position.x,
+            y: balls[index].position.y,
+          });
         },
         onPanResponderMove: (evt, { dx, dy }) => {
-          const index = evt._targetInst.memoizedProps.index;
+          const { index } = evt._targetInst.memoizedProps;
           onPressInPosition.setValue({
             x: dx,
             y: dy,
           });
-          // Animated.Value 중지된 마지막 포지션 저장
+
           if (dx > 2 || dx < -2 || dy > 2 || dy < -2) {
+            // if dragged ? not clicked
+            setClickedIndex(null);
+            // Animated.Value 중지된 마지막 포지션 저장
             onPressInPosition.stopAnimation((val) => {
               balls[index].position.x = val.x;
               balls[index].position.y = val.y;
             });
           }
         },
-        onPanResponderRelease: () => {},
-        onPanResponderEnd: (evt, { dx, dy }) => {
-          const index = evt._targetInst.memoizedProps.index;
-          setOnPressInIndex(null);
-          onPressInPosition.setValue({ x: 0, y: 0 });
+        onPanResponderRelease: (evt, { dx, dy }) => {
+          const { index, alphabet } = evt._targetInst.memoizedProps;
 
           if (dx < 2 && dx > -2 && dy < 2 && dy > -2) {
-            if (correctIndex === index) {
-              correctIndexClickedAnim.start();
-              // DOESN'T WORK
-
-              //   () => {
-              //   setAnswer((prev) => prev + alphabet);
-              //   ballScale.setValue(1);
-              //   // 알파벳 볼 제거
-              //   setHiddenBalls([...hiddenBalls, index]);
-              // });
-              // setCorrectIndex((prev) => prev + 1);
+            // if clicked ? not dragged
+            if (correctIndex === clickedIndex) {
+              //correctIndex는 디폴트 0으로 시작한다
+              correctIndexClickedAnim.start(() => {
+                setAnswer((prev) => prev + alphabet);
+                ballScale.setValue(1);
+                // // 알파벳 볼 제거
+                setHiddenBalls([...hiddenBalls, index]);
+                setCorrectIndex((prev) => prev + 1);
+              });
             }
           }
         },
@@ -286,10 +285,16 @@ export default function App() {
                   left: ball.index !== onPressInIndex ? ball.position.x : 0,
                   top: ball.index !== onPressInIndex ? ball.position.y : 0,
                   transform:
-                    ball.index === onPressInIndex
+                    ball.index === onPressInIndex && ball.index !== clickedIndex
                       ? [
                           { translateX: onPressInPosition.x },
                           { translateY: onPressInPosition.y },
+                        ]
+                      : ball.index === clickedIndex &&
+                        ball.index === onPressInIndex
+                      ? [
+                          { translateX: correctIndexPosition.x },
+                          { translateY: correctIndexPosition.y },
                           { scale: ballScale },
                         ]
                       : null,
