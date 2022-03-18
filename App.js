@@ -115,6 +115,7 @@ export default function App() {
 
   const onPressInPosition = useRef(new Animated.ValueXY()).current;
   const correctIndexPosition = useRef(new Animated.ValueXY()).current;
+  const wrongIndexPosition = useRef(new Animated.ValueXY()).current;
 
   const ballScale = useRef(new Animated.Value(1)).current;
   const answerBgOpacity = useRef(new Animated.Value(0)).current;
@@ -165,14 +166,6 @@ export default function App() {
     Animated.parallel([answerFadeOut, answerBgFadeIn]),
     Animated.parallel([answerFadeIn, answerBgFadeOut]),
   ]);
-  const wrongIndexClickedAnim = Animated.spring(onPressInPosition, {
-    toValue: {
-      x: onPressInPosition.x._value + getRandomNumber(10),
-      y: onPressInPosition.y._value + getRandomNumber(10),
-    },
-    useNativeDriver: true,
-    tension: 1000,
-  });
   const correctIndexClickedAnim = Animated.sequence([
     moveBallToBottom,
     Animated.parallel([scaleOut, moveBallToCenter, contentFadeAnim]),
@@ -196,6 +189,10 @@ export default function App() {
             x: balls[index].position.x,
             y: balls[index].position.y,
           });
+          wrongIndexPosition.setValue({
+            x: balls[index].position.x,
+            y: balls[index].position.y,
+          });
         },
         onPanResponderMove: (evt, { dx, dy }) => {
           const { index } = evt._targetInst.memoizedProps;
@@ -203,32 +200,46 @@ export default function App() {
             x: dx,
             y: dy,
           });
-
-          if (dx > 2 || dx < -2 || dy > 2 || dy < -2) {
-            // if dragged ? not clicked
-            setClickedIndex(null);
-            // Animated.Value 중지된 마지막 포지션 저장
-            onPressInPosition.stopAnimation((val) => {
-              balls[index].position.x = val.x;
-              balls[index].position.y = val.y;
-            });
+          // if clicked
+          if (dx < 2 && dx > -2 && dy < 2 && dy > -2) {
+            return;
           }
+          setClickedIndex(null);
+          // Animated.Value 중지된 마지막 포지션 저장
+          onPressInPosition.stopAnimation((val) => {
+            balls[index].position.x = val.x;
+            balls[index].position.y = val.y;
+          });
         },
         onPanResponderRelease: (evt, { dx, dy }) => {
           const { index, alphabet } = evt._targetInst.memoizedProps;
-
-          if (dx < 2 && dx > -2 && dy < 2 && dy > -2) {
-            // if clicked ? not dragged
-            if (correctIndex === clickedIndex) {
-              //correctIndex는 디폴트 0으로 시작한다
-              correctIndexClickedAnim.start(() => {
-                setAnswer((prev) => prev + alphabet);
-                ballScale.setValue(1);
-                // // 알파벳 볼 제거
-                setHiddenBalls([...hiddenBalls, index]);
-                setCorrectIndex((prev) => prev + 1);
+          // if dragged
+          if (dx > 2 || dx < -2 || dy > 2 || dy < -2) {
+            return;
+          }
+          if (correctIndex === index) {
+            correctIndexClickedAnim.start(() => {
+              setAnswer((prev) => prev + alphabet);
+              ballScale.setValue(1);
+              setHiddenBalls([...hiddenBalls, index]);
+              setCorrectIndex((prev) => prev + 1);
+            });
+          } else {
+            // 정답이 아닌 볼을 클릭한다면
+            Animated.spring(wrongIndexPosition, {
+              toValue: {
+                x: balls[index].position.x + getRandomNumber(15),
+                y: balls[index].position.y + getRandomNumber(15),
+              },
+              useNativeDriver: true,
+              tension: 1000,
+              duration: 500,
+            }).start(() => {
+              wrongIndexPosition.setValue({
+                x: balls[index].position.x,
+                y: balls[index].position.y,
               });
-            }
+            });
           }
         },
       }),
@@ -286,17 +297,17 @@ export default function App() {
                   top: ball.index !== onPressInIndex ? ball.position.y : 0,
                   transform:
                     ball.index === onPressInIndex && ball.index !== clickedIndex
-                      ? [
-                          { translateX: onPressInPosition.x },
-                          { translateY: onPressInPosition.y },
-                        ]
+                      ? onPressInPosition.getTranslateTransform()
                       : ball.index === clickedIndex &&
-                        ball.index === onPressInIndex
+                        ball.index === onPressInIndex &&
+                        ball.index === correctIndex
                       ? [
-                          { translateX: correctIndexPosition.x },
-                          { translateY: correctIndexPosition.y },
+                          ...correctIndexPosition.getTranslateTransform(),
                           { scale: ballScale },
                         ]
+                      : ball.index !== correctIndex &&
+                        ball.index === clickedIndex
+                      ? wrongIndexPosition.getTranslateTransform()
                       : null,
                 }}
               >
