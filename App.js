@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
+  Dimensions,
   Animated,
   PanResponder,
   View,
-  Dimensions,
-  Pressable,
   Text,
+  Easing,
 } from "react-native";
 import styled from "styled-components/native";
 import { Ionicons } from "@expo/vector-icons";
 import icons from "./icons";
+
+const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get("window");
 
 const MAIN_COLOR = "#CE0C5C";
 const ICONS_LENGTH = icons.length;
@@ -21,8 +23,6 @@ const ANSWER_CONTAINER_FLEX = 1;
 const ALL_CONTAINER_FLEX =
   QUIZ_CONTAINER_FLEX + WORDS_CONTAINER_FLEX + ANSWER_CONTAINER_FLEX;
 
-const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get("window");
-
 // max exclusive: should be ICONS_LENGTH + 1
 const getRandomNumber = (max) => Math.floor(Math.random() * max);
 
@@ -31,10 +31,44 @@ const getRandomPosition = (maxX, maxY) => {
   const y = getRandomNumber(maxY - ALPHABET_BALL_SIZE);
   return { x, y };
 };
-const Container = styled.View`
+const Background = styled.View`
   background-color: ${MAIN_COLOR};
   flex: 1;
 `;
+const InteractiveContainer = styled.View`
+  flex: 1;
+`;
+const FinalContainer = styled.View`
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+`;
+
+const FinalCheckContainer = styled(Animated.createAnimatedComponent(View))`
+  background-color: white;
+  width: 200px;
+  height: 200px;
+  border-radius: 100px;
+  justify-content: center;
+  align-items: center;
+`;
+
+const FinalAnswerContainer = styled(Animated.createAnimatedComponent(View))`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
+
+const FinalAnswerIconBg = styled(FinalCheckContainer)``;
+
+const FinalWord = styled(Animated.createAnimatedComponent(Text))`
+  color: white;
+  font-size: 36px;
+  font-weight: 600;
+  text-align: center;
+  padding: 20px;
+`;
+
 const QuizIconContainer = styled.View`
   flex: ${QUIZ_CONTAINER_FLEX};
   justify-content: flex-end;
@@ -112,16 +146,25 @@ export default function App() {
   const [wordContainerHeight, setWordContainerHeight] = useState();
   const [answer, setAnswer] = useState("");
   const [hiddenBalls, setHiddenBalls] = useState([]);
+  const [success, setSuccess] = useState(false);
+  const [final, setFinal] = useState(false);
 
   const onPressInPosition = useRef(new Animated.ValueXY()).current;
   const correctIndexPosition = useRef(new Animated.ValueXY()).current;
   const wrongIndexPosition = useRef(new Animated.ValueXY()).current;
 
   const ballScale = useRef(new Animated.Value(1)).current;
-  const answerBgOpacity = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const bgOpacity = useRef(new Animated.Value(0)).current;
   const answerOpacity = useRef(new Animated.Value(1)).current;
   const answerBgWidth = useRef(new Animated.Value(60)).current;
   const answerBorderWidth = useRef(new Animated.Value(60)).current;
+  // FINAL ANSWER VALUES
+  const checkScale = useRef(new Animated.Value(0)).current;
+  const checkOpacity = useRef(new Animated.Value(1)).current;
+  const finalAnswerOpacity = useRef(new Animated.Value(0)).current;
+  const finalAnswerScale = useRef(new Animated.Value(0)).current;
+  const finalAnswerPositionY = useRef(new Animated.Value(0)).current;
 
   const scaleOut = Animated.timing(ballScale, {
     toValue: 0,
@@ -134,23 +177,23 @@ export default function App() {
     },
     useNativeDriver: true,
   });
-  const answerBgFadeIn = Animated.timing(answerBgOpacity, {
+  const answerBgFadeIn = Animated.timing(bgOpacity, {
     toValue: 0.5,
     duration: 200,
     useNativeDriver: false,
   });
-  const answerBgFadeOut = Animated.timing(answerBgOpacity, {
+  const answerBgFadeOut = Animated.timing(bgOpacity, {
     toValue: 0,
     duration: 200,
     useNativeDriver: false,
   });
-  const answerFadeIn = Animated.timing(answerOpacity, {
-    toValue: 1,
+  const answerFadeOut = Animated.timing(answerOpacity, {
+    toValue: 0,
     duration: 200,
     useNativeDriver: true,
   });
-  const answerFadeOut = Animated.timing(answerOpacity, {
-    toValue: 0,
+  const answerFadeIn = Animated.timing(answerOpacity, {
+    toValue: 1,
     duration: 200,
     useNativeDriver: true,
   });
@@ -162,15 +205,53 @@ export default function App() {
     duration: 10,
     useNativeDriver: true,
   });
-  const contentFadeAnim = Animated.sequence([
+  const wordContentFadeAnim = Animated.sequence([
     Animated.parallel([answerFadeOut, answerBgFadeIn]),
     Animated.parallel([answerFadeIn, answerBgFadeOut]),
   ]);
   const correctIndexClickedAnim = Animated.sequence([
     moveBallToBottom,
-    Animated.parallel([scaleOut, moveBallToCenter, contentFadeAnim]),
+    Animated.parallel([scaleOut, moveBallToCenter, wordContentFadeAnim]),
   ]);
-
+  // FINAL ANSWER ANIM
+  const checkScaleIn = Animated.timing(checkScale, {
+    toValue: 1,
+    easing: Easing.bounce,
+    useNativeDriver: true,
+  });
+  const checkScaleMore = Animated.timing(checkScale, {
+    toValue: 20,
+    easing: Easing.linear,
+    useNativeDriver: true,
+  });
+  const checkFadeOut = Animated.timing(checkOpacity, {
+    toValue: 0,
+    useNativeDriver: true,
+  });
+  const finalCheckAnim = Animated.sequence([
+    checkScaleIn,
+    Animated.parallel([checkScaleMore, checkFadeOut]),
+  ]);
+  const finalAnswerScaleIn = Animated.spring(finalAnswerScale, {
+    toValue: 1,
+    useNativeDriver: true,
+    duration: 2000,
+  });
+  const finalAnswerFadeOut = Animated.spring(finalAnswerOpacity, {
+    toValue: 1,
+    useNativeDriver: true,
+    duration: 2000,
+  });
+  const finalAnswerAnim = Animated.parallel([
+    finalAnswerScaleIn,
+    finalAnswerFadeOut,
+  ]);
+  const finalAnswerTranslateY = Animated.spring(finalAnswerPositionY, {
+    toValue: WINDOW_HEIGHT,
+    speed: 80,
+    useNativeDriver: true,
+    delay: 1000,
+  });
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -218,6 +299,7 @@ export default function App() {
             return;
           }
           if (correctIndex === index) {
+            opacity.setValue(1);
             correctIndexClickedAnim.start(() => {
               setAnswer((prev) => prev + alphabet);
               ballScale.setValue(1);
@@ -266,76 +348,151 @@ export default function App() {
   }, [word, loading]);
 
   useEffect(() => {
-    // const randomIndex = getRandomNumber(ICONS_LENGTH + 1);
-    const randomIndex = getRandomNumber(1);
+    const randomIndex = getRandomNumber(ICONS_LENGTH + 1);
     setQuizIconIndex(randomIndex);
     setWord(icons[randomIndex]);
   }, []);
 
+  const resetFinal = () => {
+    checkOpacity.setValue(0);
+    checkScale.setValue(1);
+    finalAnswerScale.setValue(0);
+    finalAnswerOpacity.setValue(0);
+  };
+  useEffect(() => {
+    console.log(word, answer);
+    if (word === answer && word !== "" && answer !== "") {
+      setSuccess(true);
+      finalCheckAnim.start(() => {
+        checkScale.stopAnimation(() => {
+          setFinal(true);
+          Animated.sequence([finalAnswerAnim, finalAnswerTranslateY]).start(
+            resetFinal
+          );
+        });
+      });
+    }
+  }, [word, answer]);
+
   return (
-    <Container>
-      <QuizIconContainer>
-        <Ionicons name={icons[quizIconIndex]} size={90} color="white" />
-      </QuizIconContainer>
-      <WordsContainer
-        onLayout={({
-          nativeEvent: {
-            layout: { height },
-          },
-        }) => setWordContainerHeight(height)}
-      >
-        {balls?.map(
-          (ball) =>
-            !hiddenBalls.includes(ball.index) && (
-              <AlphabetBall
-                {...panResponder.panHandlers}
-                index={ball.index}
-                alphabet={ball.alphabet}
-                key={ball.index}
-                style={{
-                  left: ball.index !== onPressInIndex ? ball.position.x : 0,
-                  top: ball.index !== onPressInIndex ? ball.position.y : 0,
-                  transform:
-                    ball.index === onPressInIndex && ball.index !== clickedIndex
-                      ? onPressInPosition.getTranslateTransform()
-                      : ball.index === clickedIndex &&
-                        ball.index === onPressInIndex &&
-                        ball.index === correctIndex
-                      ? [
-                          ...correctIndexPosition.getTranslateTransform(),
-                          { scale: ballScale },
-                        ]
-                      : ball.index !== correctIndex &&
-                        ball.index === clickedIndex
-                      ? wrongIndexPosition.getTranslateTransform()
-                      : null,
-                }}
-              >
-                <AlphabetText key={ball.index}>{ball.alphabet}</AlphabetText>
-              </AlphabetBall>
-            )
-        )}
-      </WordsContainer>
-      <AnswerContainer>
-        <AnswerBox>
-          <AnswerText
-            onLayout={(event) => {
-              answerBorderWidth.setValue(event.nativeEvent.layout.width);
-              answerBgWidth.setValue(event.nativeEvent.layout.width);
-            }}
-            style={{ opacity: answerOpacity }}
+    <Background>
+      {!success && (
+        <InteractiveContainer>
+          <QuizIconContainer>
+            <Ionicons name={icons[quizIconIndex]} size={90} color="white" />
+          </QuizIconContainer>
+          <WordsContainer
+            onLayout={({
+              nativeEvent: {
+                layout: { height },
+              },
+            }) => setWordContainerHeight(height)}
           >
-            {answer}_
-          </AnswerText>
-          <AnswerBg
-            style={{
-              opacity: answerBgOpacity,
-              width: answerBgWidth,
-            }}
-          />
-          <AnswerBorder style={{ width: answerBorderWidth }} />
-        </AnswerBox>
-      </AnswerContainer>
-    </Container>
+            {balls?.map(
+              (ball) =>
+                !hiddenBalls.includes(ball.index) && (
+                  <AlphabetBall
+                    {...panResponder.panHandlers}
+                    index={ball.index}
+                    alphabet={ball.alphabet} // passing to Pan Responder
+                    key={ball.index}
+                    style={{
+                      left: ball.index !== onPressInIndex ? ball.position.x : 0,
+                      top: ball.index !== onPressInIndex ? ball.position.y : 0,
+                      transform:
+                        ball.index === onPressInIndex &&
+                        ball.index !== clickedIndex
+                          ? onPressInPosition.getTranslateTransform()
+                          : ball.index === clickedIndex &&
+                            ball.index === correctIndex
+                          ? [
+                              ...correctIndexPosition.getTranslateTransform(),
+                              { scale: ballScale },
+                            ]
+                          : ball.index !== correctIndex &&
+                            ball.index === clickedIndex
+                          ? wrongIndexPosition.getTranslateTransform()
+                          : null,
+                    }}
+                  >
+                    <AlphabetText key={ball.index}>
+                      {ball.alphabet}
+                    </AlphabetText>
+                  </AlphabetBall>
+                )
+            )}
+          </WordsContainer>
+          <AnswerContainer>
+            <AnswerBox>
+              <AnswerText
+                onLayout={(event) => {
+                  const { width } = event.nativeEvent.layout;
+                  answerBorderWidth.setValue(width);
+                  answerBgWidth.setValue(width);
+                }}
+                style={{ opacity: answerOpacity }}
+              >
+                {answer}_
+              </AnswerText>
+              <AnswerBg
+                style={{
+                  opacity: bgOpacity,
+                  width: answerBgWidth,
+                }}
+              />
+              <AnswerBorder style={{ width: answerBorderWidth }} />
+            </AnswerBox>
+          </AnswerContainer>
+        </InteractiveContainer>
+      )}
+      {success && (
+        <FinalContainer>
+          {!final && (
+            <FinalCheckContainer
+              style={{
+                opacity: checkOpacity,
+                transform: [{ scale: checkScale }],
+              }}
+            >
+              <Ionicons
+                name="checkmark"
+                color="#3EB747"
+                size={120}
+                style={{
+                  lineHeight: 120,
+                  textAlign: "center",
+                  fontWeight: 600,
+                }}
+              />
+            </FinalCheckContainer>
+          )}
+          {final && (
+            <FinalAnswerContainer
+              style={{
+                opacity: final,
+                transform: [
+                  { scale: finalAnswerScale },
+                  { translateY: finalAnswerPositionY },
+                ],
+              }}
+            >
+              <FinalAnswerIconBg>
+                <Ionicons
+                  name={word}
+                  color={MAIN_COLOR}
+                  size={120}
+                  style={{
+                    lineHeight: 120,
+                    textAlign: "center",
+                    fontWeight: 600,
+                  }}
+                />
+              </FinalAnswerIconBg>
+              <FinalWord>{word}</FinalWord>
+            </FinalAnswerContainer>
+          )}
+        </FinalContainer>
+      )}
+    </Background>
   );
 }
