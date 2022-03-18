@@ -43,7 +43,6 @@ const FinalContainer = styled.View`
   justify-content: center;
   align-items: center;
 `;
-
 const FinalCheckContainer = styled(Animated.createAnimatedComponent(View))`
   background-color: white;
   width: 200px;
@@ -52,7 +51,6 @@ const FinalCheckContainer = styled(Animated.createAnimatedComponent(View))`
   justify-content: center;
   align-items: center;
 `;
-
 const FinalAnswerContainer = styled(Animated.createAnimatedComponent(View))`
   display: flex;
   justify-content: center;
@@ -68,7 +66,6 @@ const FinalWord = styled(Animated.createAnimatedComponent(Text))`
   text-align: center;
   padding: 20px;
 `;
-
 const QuizIconContainer = styled.View`
   flex: ${QUIZ_CONTAINER_FLEX};
   justify-content: flex-end;
@@ -134,17 +131,17 @@ const AnswerText = styled(Animated.createAnimatedComponent(Text))`
   align-self: center;
 `;
 export default function App() {
-  const [balls, setBalls] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [balls, setBalls] = useState([]);
   const [word, setWord] = useState("");
-  const [quizIconIndex, setQuizIconIndex] = useState(0);
+  const [answer, setAnswer] = useState("");
+  const [quizIconIndex, setQuizIconIndex] = useState();
 
   const [correctIndex, setCorrectIndex] = useState(0);
   const [onPressInIndex, setOnPressInIndex] = useState(null);
   const [clickedIndex, setClickedIndex] = useState(null);
 
   const [wordContainerHeight, setWordContainerHeight] = useState();
-  const [answer, setAnswer] = useState("");
   const [hiddenBalls, setHiddenBalls] = useState([]);
   const [success, setSuccess] = useState(false);
   const [final, setFinal] = useState(false);
@@ -152,18 +149,14 @@ export default function App() {
   const onPressInPosition = useRef(new Animated.ValueXY()).current;
   const correctIndexPosition = useRef(new Animated.ValueXY()).current;
   const wrongIndexPosition = useRef(new Animated.ValueXY()).current;
-
+  // USERS ANSWER VALUES
   const ballScale = useRef(new Animated.Value(1)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
   const bgOpacity = useRef(new Animated.Value(0)).current;
   const answerOpacity = useRef(new Animated.Value(1)).current;
   const answerBgWidth = useRef(new Animated.Value(60)).current;
-  const answerBorderWidth = useRef(new Animated.Value(60)).current;
   // FINAL ANSWER VALUES
-  const checkScale = useRef(new Animated.Value(0)).current;
-  const checkOpacity = useRef(new Animated.Value(1)).current;
-  const finalAnswerOpacity = useRef(new Animated.Value(0)).current;
-  const finalAnswerScale = useRef(new Animated.Value(0)).current;
+  const finalScale = useRef(new Animated.Value(0)).current;
+  const finalOpacity = useRef(new Animated.Value(1)).current;
   const finalAnswerPositionY = useRef(new Animated.Value(0)).current;
 
   const scaleOut = Animated.timing(ballScale, {
@@ -214,17 +207,17 @@ export default function App() {
     Animated.parallel([scaleOut, moveBallToCenter, wordContentFadeAnim]),
   ]);
   // FINAL ANSWER ANIM
-  const checkScaleIn = Animated.timing(checkScale, {
+  const checkScaleIn = Animated.timing(finalScale, {
     toValue: 1,
     easing: Easing.bounce,
     useNativeDriver: true,
   });
-  const checkScaleMore = Animated.timing(checkScale, {
+  const checkScaleMore = Animated.timing(finalScale, {
     toValue: 20,
     easing: Easing.linear,
     useNativeDriver: true,
   });
-  const checkFadeOut = Animated.timing(checkOpacity, {
+  const checkFadeOut = Animated.timing(finalOpacity, {
     toValue: 0,
     useNativeDriver: true,
   });
@@ -232,25 +225,25 @@ export default function App() {
     checkScaleIn,
     Animated.parallel([checkScaleMore, checkFadeOut]),
   ]);
-  const finalAnswerScaleIn = Animated.spring(finalAnswerScale, {
+  const finalAnswerScaleIn = Animated.spring(finalScale, {
     toValue: 1,
     useNativeDriver: true,
-    duration: 2000,
+    duration: 1000,
   });
-  const finalAnswerFadeOut = Animated.spring(finalAnswerOpacity, {
+  const finalAnswerFadeIn = Animated.spring(finalOpacity, {
     toValue: 1,
     useNativeDriver: true,
-    duration: 2000,
+    duration: 1000,
   });
   const finalAnswerAnim = Animated.parallel([
     finalAnswerScaleIn,
-    finalAnswerFadeOut,
+    finalAnswerFadeIn,
   ]);
-  const finalAnswerTranslateY = Animated.spring(finalAnswerPositionY, {
+  const finalAnswerTranslateDown = Animated.spring(finalAnswerPositionY, {
     toValue: WINDOW_HEIGHT,
     speed: 80,
     useNativeDriver: true,
-    delay: 1000,
+    delay: 500,
   });
   const panResponder = useMemo(
     () =>
@@ -299,7 +292,6 @@ export default function App() {
             return;
           }
           if (correctIndex === index) {
-            opacity.setValue(1);
             correctIndexClickedAnim.start(() => {
               setAnswer((prev) => prev + alphabet);
               ballScale.setValue(1);
@@ -325,49 +317,62 @@ export default function App() {
           }
         },
       }),
-    [balls, onPressInIndex]
+    [balls, onPressInIndex, loading]
   );
 
-  const makeAlphabets = () => {
-    const arr = word.split("");
-    const words = arr.map((alphabet, index) => {
-      const position = getRandomPosition(
-        WINDOW_WIDTH,
-        (WINDOW_HEIGHT / ALL_CONTAINER_FLEX) * WORDS_CONTAINER_FLEX
-      );
-      const word = { index, position, alphabet };
-      return word;
-    });
-    setBalls(words);
-    // setLoading(false);
-  };
+  useEffect(() => {
+    if (word) {
+      const arr = word.split("");
+      const words = arr.map((alphabet, index) => {
+        const position = getRandomPosition(
+          WINDOW_WIDTH,
+          (WINDOW_HEIGHT / ALL_CONTAINER_FLEX) * WORDS_CONTAINER_FLEX
+        );
+        const word = { index, position, alphabet };
+        return word;
+      });
+      setBalls(words);
+      setLoading(false);
+    }
+  }, [word]);
+
   useEffect(() => {
     if (loading) {
-      makeAlphabets();
+      const randomIndex = getRandomNumber(ICONS_LENGTH + 1);
+      setQuizIconIndex(randomIndex);
+      const wordString = icons[randomIndex];
+      setWord(wordString);
     }
-  }, [word, loading]);
+  }, [loading]);
 
-  useEffect(() => {
-    const randomIndex = getRandomNumber(ICONS_LENGTH + 1);
-    setQuizIconIndex(randomIndex);
-    setWord(icons[randomIndex]);
-  }, []);
-
-  const resetFinal = () => {
-    checkOpacity.setValue(0);
-    checkScale.setValue(1);
-    finalAnswerScale.setValue(0);
-    finalAnswerOpacity.setValue(0);
+  const resetAll = () => {
+    finalAnswerAnim.reset();
+    // finalAnswerTranslateDown.reset();
+    // finalScale.setValue(0);
+    // finalOpacity.setValue(1);
+    finalAnswerPositionY.setValue(0);
+    setLoading(true);
+    setSuccess(false);
+    setAnswer("");
+    setCorrectIndex(0);
+    setHiddenBalls([]);
+    setFinal(false);
+    setOnPressInIndex();
+    setClickedIndex();
   };
+
   useEffect(() => {
-    console.log(word, answer);
+    // 정답에 관한 것 >> set Loading true
+    console.log("word : ", word, word.length);
+    console.log("answer : ", answer, answer.length);
     if (word === answer && word !== "" && answer !== "") {
       setSuccess(true);
       finalCheckAnim.start(() => {
-        checkScale.stopAnimation(() => {
+        finalScale.stopAnimation(() => {
           setFinal(true);
-          Animated.sequence([finalAnswerAnim, finalAnswerTranslateY]).start(
-            resetFinal
+          finalScale.setValue(0);
+          Animated.sequence([finalAnswerAnim, finalAnswerTranslateDown]).start(
+            resetAll
           );
         });
       });
@@ -427,7 +432,6 @@ export default function App() {
               <AnswerText
                 onLayout={(event) => {
                   const { width } = event.nativeEvent.layout;
-                  answerBorderWidth.setValue(width);
                   answerBgWidth.setValue(width);
                 }}
                 style={{ opacity: answerOpacity }}
@@ -440,7 +444,7 @@ export default function App() {
                   width: answerBgWidth,
                 }}
               />
-              <AnswerBorder style={{ width: answerBorderWidth }} />
+              <AnswerBorder style={{ width: answerBgWidth }} />
             </AnswerBox>
           </AnswerContainer>
         </InteractiveContainer>
@@ -450,8 +454,8 @@ export default function App() {
           {!final && (
             <FinalCheckContainer
               style={{
-                opacity: checkOpacity,
-                transform: [{ scale: checkScale }],
+                opacity: finalOpacity,
+                transform: [{ scale: finalScale }],
               }}
             >
               <Ionicons
@@ -469,9 +473,9 @@ export default function App() {
           {final && (
             <FinalAnswerContainer
               style={{
-                opacity: final,
+                opacity: finalOpacity,
                 transform: [
-                  { scale: finalAnswerScale },
+                  { scale: finalScale },
                   { translateY: finalAnswerPositionY },
                 ],
               }}
