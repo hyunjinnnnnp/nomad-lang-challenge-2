@@ -6,6 +6,7 @@ import {
   View,
   Text,
   Easing,
+  Platform,
 } from "react-native";
 import styled from "styled-components/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -245,15 +246,24 @@ export default function App() {
     useNativeDriver: true,
     delay: 500,
   });
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponder: (_, gestureState) => {
+          return Platform.OS === "web"
+            ? gestureState.numberActiveTouches > 0
+            : true;
+        },
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: (evt) => {
+          if (Platform.OS === "web") {
+            return;
+          }
           const { index } = evt._targetInst.memoizedProps;
           setOnPressInIndex(index);
           setClickedIndex(index);
+
           // 오프셋 설정 (현 위치 누적값으로 저장)
           onPressInPosition.setOffset({
             x: balls[index].position.x,
@@ -269,6 +279,9 @@ export default function App() {
           });
         },
         onPanResponderMove: (evt, { dx, dy }) => {
+          if (Platform.OS === "web") {
+            return;
+          }
           const { index } = evt._targetInst.memoizedProps;
           onPressInPosition.setValue({
             x: dx,
@@ -286,6 +299,9 @@ export default function App() {
           });
         },
         onPanResponderRelease: (evt, { dx, dy }) => {
+          if (Platform.OS === "web") {
+            return;
+          }
           const { index, alphabet } = evt._targetInst.memoizedProps;
           // if dragged
           if (dx > 2 || dx < -2 || dy > 2 || dy < -2) {
@@ -363,19 +379,17 @@ export default function App() {
 
   useEffect(() => {
     // 정답에 관한 것 >> set Loading true
-    console.log("word : ", word, word.length);
-    console.log("answer : ", answer, answer.length);
     if (word === answer && word !== "" && answer !== "") {
-      setSuccess(true);
-      finalCheckAnim.start(() => {
-        finalScale.stopAnimation(() => {
+      setTimeout(() => {
+        setSuccess(true);
+        finalCheckAnim.start(() => {
           setFinal(true);
           finalScale.setValue(0);
           Animated.sequence([finalAnswerAnim, finalAnswerTranslateDown]).start(
             resetAll
           );
         });
-      });
+      }, 200);
     }
   }, [word, answer]);
 
@@ -417,7 +431,7 @@ export default function App() {
                           : ball.index !== correctIndex &&
                             ball.index === clickedIndex
                           ? wrongIndexPosition.getTranslateTransform()
-                          : null,
+                          : [], // FOR ANDROID: null is not obj
                     }}
                   >
                     <AlphabetText key={ball.index}>
